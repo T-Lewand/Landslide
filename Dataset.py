@@ -101,7 +101,7 @@ class Dataset:
             plt.subplots_adjust(top=0.8, left=0.15)
             plt.show()
 
-    def train_test_set(self, drop_list: list = None):
+    def train_test_set(self, drop_list: list = None, single=True, test=True, crop: float = 0, test_size=0.3):
         """Dzieli zestaw danych na treningowe i testowe. Zapisuje na dysku jako DataFrame w formacie feather"""
 
         if drop_list is None:
@@ -111,19 +111,32 @@ class Dataset:
         print(dataset_flat.columns.tolist())
 
         label = self.label_read()
-        label = pd.DataFrame(label, columns=['Label'])
+        label = pd.DataFrame(label, columns=['Target'])
 
         X = dataset_flat
         Y = label
         del dataset_flat
         gc.collect()
+        if single is False and crop > 0.0:
+            test_size = crop
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_size, random_state=12)
 
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3, random_state=12)
+        if single is True:
+            X_train.reset_index().to_feather('Model\\X_train')
+            X_test.reset_index().to_feather('Model\\X_test')
+            Y_train.reset_index().to_feather('Model\\Y_train')
+            Y_test.reset_index().to_feather('Model\\Y_test')
+        else:
+            X = X_train
+            Y = Y_train
+            if test is True:
+                set_name = 'test'
+            else:
+                set_name = 'train'
 
-        X_train.reset_index().to_feather('Model\\X_train')
-        X_test.reset_index().to_feather('Model\\X_test')
-        Y_train.reset_index().to_feather('Model\\Y_train')
-        Y_test.reset_index().to_feather('Model\\Y_test')
+            X.reset_index().to_feather('Model\\X_{}'.format(set_name))
+            Y.reset_index().to_feather('Model\\Y_{}'.format(set_name))
+
         del X_train
         del Y_train
         del X_test
