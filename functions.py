@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from Utilities import *
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, roc_curve
 from sklearn.feature_selection import SelectKBest, f_classif, chi2, mutual_info_classif
@@ -285,8 +287,11 @@ def multi_lsm_stats(AOI: str, fs_style: list, boundaries, lsm_directory: str, la
 def get_ratios(label, predicted):
     """Funkcja zwraca wartość False Positive Rate i True Positive Rate jako DataFrame z kolumnami ['fpr','tpr']"""
     fpr, tpr, treshold = roc_curve(label, predicted)
+    fpr_last, tpr_last = np.array(fpr[-1]).reshape(-1, 1), np.array(tpr[-1]).reshape(-1, 1)
     fpr = np.array(fpr).reshape(-1, 1)[::100000, :]
+    fpr = np.append(fpr, fpr_last, axis=0)
     tpr = np.array(tpr).reshape(-1, 1)[::100000, :]
+    tpr = np.append(tpr, tpr_last, axis=0)
     fpr_tpr = np.append(fpr, tpr, axis=1)
     pixel_ratios = pd.DataFrame(fpr_tpr, columns=['fpr', 'tpr'])
     return pixel_ratios
@@ -303,7 +308,7 @@ def auc_scoring(label, predicted, return_ratios=False):
         return auc_score
 
 
-def auc_plot(AOI: str, label_directory: str, lsm_directory: str, raster_shape: tuple, fs_styles: list = ['Pearson'],
+def auc_plot_old(AOI: str, label_directory: str, lsm_directory: str, raster_shape: tuple, fs_styles: list = ['Pearson'],
              reference_line=True):
     """Funkcja robi wykres ROC w liczbie takiej ile elementów w fs_style. Funkcja podczytuje dane sama, wystarczy dać
     jej scieżki do folderów z danymi."""
@@ -354,3 +359,78 @@ def lcf_stats(AOI1, AOI2):
         stats_merged = pd.concat([stats_merged, stats_df], axis=1)
 
     stats_merged.to_csv('{}LCF_Stats.csv'.format('Data\\'))
+
+def target_set():
+    """Tworzy Target datasets dla obu obszarów w folderze Datasets"""
+    import Dataset
+
+    data_dir, label_dir, lsm_dir, target_shape, LCF_files, LCF_names = header('BDunajec', reset_origin=False)
+    set_BD = Dataset.Dataset(data_dir, target_shape, 'BDunajec_dataset.fth', label_dir)
+    set_BD.label_feather()
+    data_dir, label_dir, lsm_dir, target_shape, LCF_files, LCF_names = header('Roznow', reset_origin=False)
+    set_R = Dataset.Dataset(data_dir, target_shape, 'Roznow_dataset.fth', label_dir)
+    set_R.label_feather()
+
+def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=False):
+    """Tworzy wykresy krzywej ROC dla obszarów podanych w AOI_train i AOI_test.
+    AOI_train: lista obszarów treningowych
+    AOI_test: lista obszarów testowych
+    titles: tytuły poszczególnych wykresów, i liczba musi być równa sumie elementów list AOI_train i AOI_test
+    """
+
+    import Dataset
+    import LSM
+
+    if create_target_sets:
+        target_set()
+
+    fig, ax = plt.subplots(len(AOI_train), len(AOI_test))
+    fig.suptitle("Receiver Operating Characteristic")
+    iterator_k = 0
+
+    for k in AOI_train:
+        iterator_j = 0
+        data_dir, label_dir, lsm_dir, target_shape, LCF_files, LCF_names = header(k, reset_origin=False)
+        try:
+            label_set = Dataset.Dataset(label_dir, target_shape, '{}_Target.fth'.format(k), label_dir)
+            label_train = label_set.read_feather()
+        except:
+            print("No Target datasets, create first")
+            exit()
+
+        if k == AOI_train[1]:
+            AOI_test.reverse()
+        for j in AOI_test:
+            data_dir, label_dir, lsm_dir, target_shape_test, LCF_files, LCF_names = header(j, reset_origin=False)
+            label_set = Dataset.Dataset(label_dir, target_shape, '{}_Target.fth'.format(j), label_dir)
+            label_test = label_set.read_feather()
+
+            lsm = LSM.LSM(k, j, lsm_dir, target_shape_test)
+            fs_methods = ['Pearson', 'Anova', 'SU']
+            ref_data = pd.DataFrame(np.array([0, 0, 1, 1]).reshape((2, 2)), columns=['fpr', 'tpr'])
+
+            axes = ax[iterator_k, iterator_j]
+            ref_line = axes.plot(ref_data['fpr'], ref_data['tpr'], linestyle='--', label='Reference line')
+
+            for i in fs_methods:
+                lsm_set = lsm.read(i).flatten()
+                auc, ratios = auc_scoring(label_test, lsm_set, return_ratios=True)
+                roc = axes.plot(ratios['fpr'], ratios['tpr'], label='{}, AUC = {:.4f}'.format(i, auc))
+
+                axes.set_xlabel('False Positive Rate')
+                axes.set_ylabel('True Positive Rate')
+                axes.set_title(titles[iterator_k][iterator_j])
+                axes.legend(loc='lower right')
+                # plt.xlim([-0.01, 1])
+                # plt.ylim([0, 1.01])
+
+
+
+            iterator_j += 1
+        iterator_k += 1
+
+    fig.tight_layout()
+    fig.set_size_inches((12.0, 9.0))
+    plt.subplots_adjust(wspace=0.2, hspace=0.3, top=0.9)
+    plt.savefig("AUC_plot.jpg", dpi=2000)
+    plt.show()

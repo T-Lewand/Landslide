@@ -14,8 +14,8 @@ class LSM:
         self.directory = directory
         self.shape = shape
 
-    def read(self, fs_method):
-        """Funkcja czyta mapy podatnośći osuwiskowej jako macierz numpy
+    def read(self, fs_method, show=False):
+        """Funkcja czyta mapy podatności osuwiskowej jako macierz numpy
         fs_method: nazwa metody feature selection
         """
 
@@ -23,11 +23,18 @@ class LSM:
         for i in lsm_files:
             if '{}_{}'.format(self.name, fs_method) in i:
                 lsm = i
+
         try:
             lsm_data = rio_reader('{}{}'.format(self.directory, lsm), self.shape)
+            if show is True:
+                plt.imshow(lsm_data)
+                plt.show()
             return lsm_data
         except:
-            print("Nie istniejący plik: {}_{}".format(self.name, fs_method))
+            print("LSM read - Nie istniejący plik: {}_{}".format(self.name, fs_method))
+            exit()
+
+
 
     def evaluate_one(self, fs_method: str, boundaries: list, label_directory: str, df_return=False):
         """Funkcja analizuje dokładność pojedyńczego rastra podatności osuwiskowej.
@@ -57,6 +64,7 @@ class LSM:
             accuracy = accuracy_score(label_data, lsm_clasiff)
             precision = precision_score(label_data, lsm_clasiff)
             recall = recall_score(label_data, lsm_clasiff)
+
             F1_score = 2 * (precision * recall) / (precision + recall)
 
             stats_df[i][indexes[0]] = accuracy
@@ -83,3 +91,5 @@ class LSM:
         merged_df.drop(columns=[merged_df.columns.tolist()[0]])
         print(merged_df)
         merged_df.to_csv('{}Stats\\{}_Stats.csv'.format(self.directory, self.name))
+
+

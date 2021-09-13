@@ -1,3 +1,5 @@
+import pandas as pd
+
 from functions import *
 import ITMO_FS
 
@@ -8,7 +10,7 @@ class Dataset:
 
         :param directory: ścieżka do folderu z LCF
         :param shape: rozmiar rastra
-        :param name: Pełna nazwa zestawu danych (np. BDunajec_dataset.fth
+        :param name: Pełna nazwa zestawu danych (np. BDunajec_dataset.fth)
         :param label_directory: scieżka do folderu label
         """
         self.directory = directory
@@ -22,9 +24,12 @@ class Dataset:
             self.columns.append(i.split('_')[1].split('.')[0])
 
         self.categorical = ['LC', 'Soil suitability', 'Soil type', 'Soil texture', 'Tectonics']
-        self.numerical = self.columns
-        for i in self.categorical:
-            self.numerical.remove(i)
+        try:
+            self.numerical = self.columns.copy()
+            for i in self.categorical:
+                self.numerical.remove(i)
+        except:
+            pass
 
     def create_feather(self):
         """Podczytuje obrazy w folderze data_dir  i gromadzi je w jedną macierz, gdzie
@@ -37,9 +42,15 @@ class Dataset:
 
         dataset_df.to_feather('Datasets\\{}'.format(self.name))
 
+    def label_feather(self):
+        """Zapisuje dane Target w formacie feather w folderze Datasets"""
+        label_set = self.label_read()
+        label_df = pd.DataFrame(label_set, columns=['Target'])
+        label_df.to_feather('Datasets\\{}_Target.fth'.format(self.aoi))
+
     def read_feather(self):
         """Czyta i zwraca zestaw danych zapisanych w formacie feather"""
-        dataset = pd.read_feather(self.name)
+        dataset = pd.read_feather('Datasets\\{}'.format(self.name))
         return dataset
 
     def label_read(self):
@@ -58,7 +69,7 @@ class Dataset:
         fit = selection.fit(dataset, label_data)
         scores = pd.DataFrame(fit.scores_.T, index=[self.columns], columns=['score'])
         scores.sort_values(by=['score'], inplace=True, ascending=False)
-        scores.to_csv('Feature_selection\\{}_Anova_score.csv'.format(self.name))
+        scores.to_csv('Feature_selection\\{}_Anova_score.csv'.format(self.aoi))
         if show is True:
             print(scores)
 
@@ -66,11 +77,13 @@ class Dataset:
         """Zapisuje wartości Symmetrical Uncertainty dla każdej zmiennej"""
 
         label_data = self.label_read()
-        dataset = self.read_feather().to_numpy().T
+
+        dataset = self.read_feather().to_numpy()
+
         pd.options.display.float_format = '{:.3f}'.format
         scores = ITMO_FS.su_measure(dataset, label_data.flatten())
         scores = pd.DataFrame([scores], columns=self.columns)
-        scores.to_csv('Feature_selection\\{}_SU_score.csv'.format(self.name))
+        scores.to_csv('Feature_selection\\{}_SU_score.csv'.format(self.aoi))
         if show is True:
             print(scores)
 
@@ -79,19 +92,20 @@ class Dataset:
 
         dataset = self.read_feather()
         label = self.label_read()
+        columns = self.columns.copy()
+        columns.append('Target')
         dataset_labeled = np.append(dataset, label, axis=1)
-        pearson_matrix = np.corrcoef(dataset_labeled)
-        columns = self.columns.append('Target')
-        pearson_matrix = pd.DataFrame([pearson_matrix], columns=columns, index=columns)
-        pearson_matrix.to_csv('Feature_selection\\{}_Pearson.txt'.format(self.name))
+        pearson_matrix = np.corrcoef(dataset_labeled.T)
 
+        pearson_matrix = pd.DataFrame(pearson_matrix, columns=columns, index=columns)
+        pearson_matrix.to_csv('Feature_selection\\{}_Pearson.txt'.format(self.aoi))
         target_pearson = pearson_matrix['Target'].drop(index=['Target'])
-        target_pearson.to_csv('Feature_selection\\{}_Target_Pearson.txt'.format(self.name))
+        target_pearson.to_csv('Feature_selection\\{}_Target_Pearson.txt'.format(self.aoi))
 
         if show is True:
             fig, ax = plt.subplots(tight_layout=False)
             cbar_kws = dict(shrink=1)
-            heatmap = sns.heatmap(pearson_matrix, annot=True, fmt='.2f', xticklabels=True, yticklabels=True,
+            heatmap = sns.heatmap(np.abs(pearson_matrix), annot=True, fmt='.2f', xticklabels=True, yticklabels=True,
                                   cmap='rocket', cbar_kws=cbar_kws)
             heatmap.set_xticklabels(heatmap.get_xticklabels(), rotation=50, ha='left')
             heatmap.xaxis.tick_top()
@@ -102,7 +116,16 @@ class Dataset:
             plt.show()
 
     def train_test_set(self, drop_list: list = None, single=True, test=True, crop: float = 0, test_size=0.3):
-        """Dzieli zestaw danych na treningowe i testowe. Zapisuje na dysku jako DataFrame w formacie feather"""
+        """Dzieli zestaw danych na treningowe i testowe. Zapisuje na dysku jako DataFrame w formacie feather
+        Jeśli single True, nie przejmować się zmiennymi test i crop
+        drop_list: lista LCF do odrzucenia w uczeniu
+        single: wartość True jeśli model trenowany i testowany na tym samym obszarze
+        test: tylko jeśli single= True, jeśli test True to z tego zestawy tworzony jest zestawe testowy jeśli
+              False - treningowy
+        crop: tylko jeśli single= True. Losowo przycina zestaw danych o podanych ułamek. Stosować tylko jeśli dane są
+              za duże do przerobienia
+        test_size: ułamek danych jaki ma być zestawem testowym
+        """
 
         if drop_list is None:
             dataset_flat = pd.read_feather('Datasets\\{}'.format(self.name))
