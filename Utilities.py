@@ -11,6 +11,9 @@ import seaborn as sns
 import os
 import gc
 
+def project_origin():
+    directory = os.getcwd()
+    os.chdir(directory[0:-7])
 
 def header(AOI, reset_origin=True):
     """Funkcja nagłówek. Napisana do uproszecznia kodu. Nie trzeba teraz robić nagłówka dużego w każdym pliku .py
@@ -19,12 +22,11 @@ def header(AOI, reset_origin=True):
     BDunajec_shape = (7588, 5222)
     Roznow_shape = (6817, 5451)
     if reset_origin is True:
-        directory = os.getcwd()
-        os.chdir(directory[0:-7])
+        project_origin()
 
     data_dir = '{}\\Data\\{}_LCFs\\'.format(os.getcwd(), AOI)
     label_dir = '{}\\Data\\{}_label\\'.format(os.getcwd(), AOI)
-    lsm_dir = '{}\\LSM\\'.format(os.getcwd())
+    lsm_dir = '{}\\LSM-non_cat\\'.format(os.getcwd())
     if AOI == 'Roznow':
         target_shape = Roznow_shape
     else:
@@ -38,22 +40,25 @@ def header(AOI, reset_origin=True):
     return data_dir, label_dir, lsm_dir, target_shape, LCF_files, LCF_names
 
 
-def list_files(data_directory: str):
-    """Funkcja zwraca nazwy obrazów .tif znajdujących się w danym folderze data_directory jako listę stringów"""
+def list_files(data_directory: str, form: str = 'tif'):
+    """Funkcja zwraca nazwy plików w formacie form znajdujących się w danym folderze data_directory jako listę stringów
+    data_directory: scieżka do folderu z danymi
+    form: format szukanych plików
+    """
 
     LCF_files = []
     all_files = os.listdir(data_directory)
     for i in all_files:
-        if '.tif.' in i:
+        if '.{}.'.format(form) in i:
             pass
         else:
-            if '.tif' in i:
+            if '.{}'.format(form) in i:
                 LCF_files.append(i)
 
     return LCF_files
 
 
-def logger(log_file: str, log_text: str, type: str = 'a+', folder: str = 'Logs'):
+def logger(log_file: str, log_text: str, type: str = 'a+', folder: str = 'Logs'): # dump func
     with open('{}\\{}.txt'.format(folder, log_file), type) as log_file:
         log_file.write(log_text)
         log_file.close()
