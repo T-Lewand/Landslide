@@ -4,7 +4,6 @@ import pandas as pd
 import rasterio as rio
 from rasterio.enums import Resampling
 
-
 from matplotlib import pyplot as plt
 import seaborn as sns
 
@@ -58,7 +57,7 @@ def list_files(data_directory: str, form: str = 'tif'):
     return LCF_files
 
 
-def logger(log_file: str, log_text: str, type: str = 'a+', folder: str = 'Logs'): # dump func
+def logger(log_file: str, log_text: str, type: str = 'a+', folder: str = 'Logs'):
     with open('{}\\{}.txt'.format(folder, log_file), type) as log_file:
         log_file.write(log_text)
         log_file.close()

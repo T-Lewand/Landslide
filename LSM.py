@@ -34,6 +34,9 @@ class LSM:
             print("LSM read - Nie istniejący plik: {}_{}".format(self.name, fs_method))
             exit()
 
+    def calculate_lsm(self):
+        import xgboost as xgb
+
 
 
     def evaluate_one(self, fs_method: str, boundaries: list, label_directory: str, df_return=False):

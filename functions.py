@@ -71,7 +71,7 @@ def flatten(dataset):
     return variables
 
 
-def PCC_matrix(file_name: str, dataset):
+def PCC_matrix(file_name: str, dataset): #dump func
     """Dataset musi być flat. Jeden wiersz jedna zmienna."""
     PCC = np.corrcoef(dataset)
     np.savetxt('{}.txt'.format(file_name), PCC, delimiter=';')
@@ -371,7 +371,7 @@ def target_set():
     set_R = Dataset.Dataset(data_dir, target_shape, 'Roznow_dataset.fth', label_dir)
     set_R.label_feather()
 
-def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=False):
+def auc_plot(AOI_train: list, AOI_test: list, titles: list, image_name: str, create_target_sets=False, show=True):
     """Tworzy wykresy krzywej ROC dla obszarów podanych w AOI_train i AOI_test.
     AOI_train: lista obszarów treningowych
     AOI_test: lista obszarów testowych
@@ -385,6 +385,7 @@ def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=F
         target_set()
 
     fig, ax = plt.subplots(len(AOI_train), len(AOI_test))
+
     fig.suptitle("Receiver Operating Characteristic")
     iterator_k = 0
 
@@ -398,7 +399,7 @@ def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=F
             print("No Target datasets, create first")
             exit()
 
-        if k == AOI_train[1]:
+        if len(AOI_train) > 1 and k == AOI_train[-1]:
             AOI_test.reverse()
         for j in AOI_test:
             data_dir, label_dir, lsm_dir, target_shape_test, LCF_files, LCF_names = header(j, reset_origin=False)
@@ -408,8 +409,16 @@ def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=F
             lsm = LSM.LSM(k, j, lsm_dir, target_shape_test)
             fs_methods = ['Pearson', 'Anova', 'SU']
             ref_data = pd.DataFrame(np.array([0, 0, 1, 1]).reshape((2, 2)), columns=['fpr', 'tpr'])
+            if len(AOI_test) == 1 and len(AOI_train) == 1:
+                axes = ax
+            else:
+                if len(ax.shape) == 1 and len(AOI_train) == 1:
+                    axes = ax[iterator_j]
+                elif len(ax.shape) == 1 and len(AOI_test) == 1:
+                    axes = ax[iterator_k]
+                else:
+                    axes = ax[iterator_k, iterator_j]
 
-            axes = ax[iterator_k, iterator_j]
             ref_line = axes.plot(ref_data['fpr'], ref_data['tpr'], linestyle='--', label='Reference line')
 
             for i in fs_methods:
@@ -421,16 +430,14 @@ def auc_plot(AOI_train: list, AOI_test: list, titles: list, create_target_sets=F
                 axes.set_ylabel('True Positive Rate')
                 axes.set_title(titles[iterator_k][iterator_j])
                 axes.legend(loc='lower right')
-                # plt.xlim([-0.01, 1])
-                # plt.ylim([0, 1.01])
-
-
 
             iterator_j += 1
+
         iterator_k += 1
 
     fig.tight_layout()
     fig.set_size_inches((12.0, 9.0))
     plt.subplots_adjust(wspace=0.2, hspace=0.3, top=0.9)
-    plt.savefig("AUC_plot.jpg", dpi=2000)
-    plt.show()
+    plt.savefig("{}.jpg".format(image_name), dpi=2000)
+    if show:
+        plt.show()
