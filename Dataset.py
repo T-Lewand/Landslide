@@ -7,7 +7,7 @@ import ITMO_FS
 class Dataset:
     def __init__(self, directory, shape, name, label_directory):
         """
-
+        Klasa do operowania zbiorami danych dla jednego obszaru.
         :param directory: ścieżka do folderu z LCF
         :param shape: rozmiar rastra
         :param name: Pełna nazwa zestawu danych (np. BDunajec_dataset.fth)
@@ -116,13 +116,15 @@ class Dataset:
             plt.show()
 
     def train_test_set(self, drop_list: list = None, single=True, test=True, crop: float = 0, test_size=0.3):
-        """Dzieli zestaw danych na treningowe i testowe. Zapisuje na dysku jako DataFrame w formacie feather
+        """
+        Dzieli zestaw danych na treningowe i testowe. Zapisuje na dysku jako DataFrame w formacie feather
         Jeśli single True, nie przejmować się zmiennymi test i crop
+
         drop_list: lista LCF do odrzucenia w uczeniu
         single: wartość True jeśli model trenowany i testowany na tym samym obszarze
-        test: tylko jeśli single= True, jeśli test True to z tego zestawy tworzony jest zestawe testowy jeśli
+        test: tylko jeśli single= False, jeśli test True to z tego zestawy tworzony jest zestawe testowy jeśli
               False - treningowy
-        crop: tylko jeśli single= True. Losowo przycina zestaw danych o podanych ułamek. Stosować tylko jeśli dane są
+        crop: tylko jeśli single= False. Losowo przycina zestaw danych o podanych ułamek. Stosować tylko jeśli dane są
               za duże do przerobienia
         test_size: ułamek danych jaki ma być zestawem testowym
         """
@@ -164,44 +166,4 @@ class Dataset:
         del Y_train
         del X_test
         del Y_test
-        gc.collect()
-
-
-    def train_test_set2(self, AOI: str, drop_list: list = None, test=True, crop: float = 0):
-        """Funkcja do tworzenie zestawów test/train z dwóch obszarów.
-        Jeśli test True to tworzy zestaw testowy jeśli False - treningowy.
-        Zapisuje na dysku jako DataFrame w formacie feather.
-        """
-
-
-        if drop_list is None:
-            dataset_flat = pd.read_feather('Datasets\\{}_dataset_LC.fth'.format(AOI))
-        else:
-            dataset_flat = pd.read_feather('Datasets\\{}_dataset_LC.fth'.format(AOI)).drop(drop_list, axis=1)
-        print(dataset_flat.columns.tolist())
-
-        label_dir = '{}\\Data\\{}_label\\'.format(os.getcwd(), AOI)
-        label = rio_reader(label_dir + '{}_Label.tif'.format(AOI), self.shape).flatten()
-        label = pd.DataFrame(label, columns=['Label'])
-
-        X = dataset_flat
-        Y = label
-        if crop > 0:
-            X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=crop, random_state=12)
-            X = X_train
-            Y = Y_train
-
-        del dataset_flat
-        del label
-        gc.collect()
-
-        if test is True:
-            X.reset_index().to_feather('Model\\X_test')
-            Y.reset_index().to_feather('Model\\Y_test')
-        else:
-            X.reset_index().to_feather('Model\\X_train')
-            Y.reset_index().to_feather('Model\\Y_train')
-
-        del X
-        del Y
         gc.collect()
